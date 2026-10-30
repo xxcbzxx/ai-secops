@@ -1,9 +1,40 @@
-id: POL-001
+id: POL-010
 
-name: SSH Authentication
+name: SSH Access Control
 
-severity: critical
+owner: Security Team
+
+category: Remote Access
+
+severity: Critical
+
+description: |
+  SSH must use key-based authentication only.
 
 requirements:
+
   password_authentication: false
+
   public_key_authentication: true
+
+  permit_root_login: false
+
+  protocol_version: 2
+
+  allowed_ciphers:
+    - chacha20-poly1305@openssh.com
+    - aes256-gcm@openssh.com
+
+evaluation:
+
+  applies_to:
+    - linux
+    - network_devices
+
+remediation:
+  - Disable password authentication.
+  - Disable root login.
+  - Deploy SSH keys.
+
+references:
+  - CIS Linux Benchmark
