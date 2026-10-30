@@ -1,0 +1,9 @@
+id: POL-001
+
+name: SSH Authentication
+
+severity: critical
+
+requirements:
+  password_authentication: false
+  public_key_authentication: true
