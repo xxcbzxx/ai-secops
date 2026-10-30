@@ -1,0 +1,39 @@
+id: POL-020
+
+name: Multi-Factor Authentication
+
+owner: Security Team
+
+category: Identity Security
+
+severity: Critical
+
+description: |
+  Administrative access requires MFA.
+
+requirements:
+
+  mfa_required: true
+
+  preferred_method: TOTP
+
+  applies_to_roles:
+    - administrator
+    - operator
+    - privileged_user
+
+systems:
+
+  - portainer
+  - proxmox
+  - grafana
+  - vpn
+  - git
+
+remediation:
+  - Enable TOTP.
+  - Enforce MFA enrollment.
+
+references:
+  - NIST 800-63
+  - CIS Controls
