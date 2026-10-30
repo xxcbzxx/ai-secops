@@ -1,0 +1,24 @@
+id: POL-040
+
+name: Administrative Workstation Standard
+
+severity: High
+
+requirements:
+
+  dedicated_admin_devices: true
+
+  endpoint_protection_required: true
+
+  full_disk_encryption: true
+
+  mfa_required: true
+
+evaluation:
+
+  applies_to:
+    - privileged_users
+
+remediation:
+  - Deploy dedicated admin workstations.
+  - Enable device encryption.
