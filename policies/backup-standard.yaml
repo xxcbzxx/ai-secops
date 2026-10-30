@@ -1,0 +1,28 @@
+id: POL-080
+
+name: Backup and Recovery
+
+severity: High
+
+requirements:
+
+  backups_required: true
+
+  daily_backups: true
+
+  offsite_copy_required: true
+
+  retention_days: 90
+
+  restore_testing_required: true
+
+evaluation:
+
+  applies_to:
+    - servers
+    - databases
+    - virtual_machines
+
+remediation:
+  - Configure backup schedules.
+  - Conduct restore testing.
