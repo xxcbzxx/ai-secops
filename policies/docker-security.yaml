@@ -1,0 +1,28 @@
+id: POL-060
+
+name: Container Security Standard
+
+severity: High
+
+requirements:
+
+  run_as_root: false
+
+  read_only_filesystem: true
+
+  latest_tag_prohibited: true
+
+  image_scanning_required: true
+
+  healthcheck_required: true
+
+evaluation:
+
+  applies_to:
+    - docker
+    - kubernetes
+
+remediation:
+  - Use non-root users.
+  - Pin image versions.
+  - Enable image scanning.
