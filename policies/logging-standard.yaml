@@ -1,0 +1,26 @@
+id: POL-090
+
+name: Logging and Monitoring
+
+severity: High
+
+requirements:
+
+  centralized_logging: true
+
+  retain_logs_days: 90
+
+  authentication_logs_required: true
+
+  security_events_required: true
+
+  time_sync_required: true
+
+evaluation:
+
+  applies_to:
+    - all_assets
+
+remediation:
+  - Configure centralized logging.
+  - Enable audit logging.
