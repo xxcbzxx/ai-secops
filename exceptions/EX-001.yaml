@@ -1,0 +1,19 @@
+exception_id: EX-001
+
+policy_id: POL-010
+
+asset:
+  - cisco-sw01
+
+status: approved
+
+reason: |
+  Switch model does not support
+  modern SSH algorithms.
+
+compensating_controls:
+  - Management VLAN
+  - ACL restricted
+  - VPN required
+
+expiry_date: Never
