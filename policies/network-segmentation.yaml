@@ -1,0 +1,37 @@
+id: POL-030
+
+name: Network Segmentation Standard
+
+owner: Security Architecture
+
+category: Network Security
+
+severity: High
+
+requirements:
+
+  management_vlan_required: true
+
+  guest_vlan_required: true
+
+  server_vlan_required: true
+
+  iot_vlan_required: true
+
+  inter_vlan_default_deny: true
+
+evaluation:
+
+  applies_to:
+    - openwrt
+    - pfsense
+    - cisco
+    - aruba
+
+remediation:
+  - Create dedicated VLANs.
+  - Restrict lateral movement.
+  - Review firewall policies.
+
+references:
+  - NIST SP 800-41
