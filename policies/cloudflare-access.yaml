@@ -1,0 +1,28 @@
+id: POL-050
+
+name: Internet-Facing Application Protection
+
+severity: High
+
+requirements:
+
+  cloudflare_access_required: true
+
+  mfa_required: true
+
+  public_admin_interfaces_prohibited: true
+
+evaluation:
+
+  applies_to:
+    - grafana
+    - portainer
+    - proxmox
+    - admin_panels
+
+exceptions:
+  - documented_break_glass_access
+
+remediation:
+  - Enable Cloudflare Access.
+  - Restrict public exposure.
