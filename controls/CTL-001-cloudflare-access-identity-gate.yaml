@@ -1,0 +1,57 @@
+# CTL-001 — Cloudflare Access identity gate for tunnel-exposed lab services
+#
+#    Compensating controls must carry VERBATIM evidence. A control without
+#    reproducible evidence is an assertion, not a control. Evidence lives
+#    OUTSIDE this file (export path/commit); the `evidence` block references
+#    it precisely so a reviewer can re-verify in minutes.
+api_version: ai-secops.gov/v1
+kind: compensating_control
+id: CTL-001
+version: "1.0.0"
+title: Cloudflare Access identity gate for tunnel-exposed lab services
+
+status: active          # draft | active | retired
+strength: strong        # strong | partial | compensating | weak
+                        # how well this control replaces the policy's primary control
+owner: platform-lead
+
+description: >-
+  All traffic to tunnel-routed lab services on ai-secops01 is terminated at
+  the Cloudflare edge, requires a Cloudflare Access identity decision
+  (email OTP enrolment restricted to organisation domain + approved groups),
+  and the origin is reachable ONLY over the outbound-only tunnel (no
+  published ports, no inbound firewall openings). Even where the internal hop
+  is plaintext (see RSK-001), the reachable attack path is reduced from
+  "anyone on any network" to "identity-approved session + VM-host access".
+
+covers_risks: [RSK-001]
+supports_exceptions: [EX-001]
+
+verification:             # how verifications are done and their last result
+  method: configuration_export_review
+  steps:
+    - Export Access application policy + policy rules for the lab tunnel host.
+    - Confirm no DNS record bypasses the tunnel for the service (no A/CNAME to origin).
+    - "`ss -tlnp` (or Portainer) shows no host-port publication for the service."
+  verified_by:
+    name: (Security Architect — to be named)
+    role: security-architecture
+  verified_at: "2026-11-01"
+  evidence_ref: "evidence/ctl-001/cloudflare-access-export-2026-11-01.json"
+  evidence_sha256: "sha256:to-be-hashed-on-import"
+  review_cadence: quarterly
+  next_review: "2027-02-01"
+
+limitations:              # honest list — weakens claims, feeds risk scoring
+  - Control assumes Cloudflare (edge TLS termination) is not itself compromised.
+  - Access evaluates identity only at session start; stolen session tokens
+    may remain valid during the session lifetime (device posture not enforced
+    on the current plan).
+  - Does not remedy the plaintext internal hop; it narrows who can reach it.
+
+related:
+  risks: [RSK-001]
+  exceptions: [EX-001]
+  policies: [POL-001]
+  standards: [STD-001]
+  adrs: []

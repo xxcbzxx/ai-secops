@@ -1,0 +1,85 @@
+# ADR-002 — Dedicated internal data plane
+api_version: ai-secops.gov/v1
+kind: adr
+id: ADR-002
+version: "1.0.0"
+title: Dedicated internal data plane (owned instances, not shared containers)
+
+status: accepted
+decided_at: "2026-11-01"
+supersedes: []
+superseded_by: []
+
+deciders:
+  - role: security-architecture
+  - role: platform-lead
+
+context: >-
+  The VM ai-secops01 already runs PostgreSQL, Qdrant, Open WebUI and Ollama
+  as existing containers, plus n8n and Portainer, under a Docker Swarm with
+  Cloudflare Tunnel ingress. Reusing those shared instances would accelerate
+  Phase 1 by a few days, but would couple AI-SecOps to containers with
+  unknown owners, unclear backups, version drift and — critically — a shared
+  blast radius: one misconfiguration on any other workload touches our data.
+  For a platform whose entire purpose is demonstrating governance honesty,
+  running on ungoverned data infrastructure is not defensible.
+
+decision: >-
+  AI-SecOps deploys and owns its own PostgreSQL, Qdrant and Ollama instances
+  inside dedicated internal Docker networks (`data`, `ai`) per
+  `infrastructure/docker-compose.yml` / `docker-stack.yml`:
+
+  1. No shared container reuse. Existing general-purpose instances are out of
+     scope for the platform; the platform never attaches workloads to them.
+  2. Network isolation: `data` and `ai` attach to nothing external; the only
+     ingress to the platform is the `edge` network behind Cloudflare Tunnel.
+  3. Ollama is OPTIONAL in Phase 1 (profiles: ["ai"]) — it is not required
+     until the Phase 3 AI layer is implemented; Open WebUI runs without it.
+  4. Healthchecks, resource limits, digest-pinned images, secrets (Swarm
+     secrets in production) and nightly backups (pg_dump, snapshots) belong
+     to the stack definition — restore drills are acceptance tests (ROADMAP §2.5).
+  5. Migration away from shared instances is a one-time data migration; the
+     old containers are then re-purposed or removed by their owners.
+
+options_considered:
+  - option: Reuse existing shared PostgreSQL/Qdrant/Ollama containers
+    pros:
+      - fastest start
+      - fewer containers on the VM
+      - less memory/CPU duplication
+    cons:
+      - shared blast radius (one bad workload takes us all down)
+      - unknown backup/restore ownership; version upgrades uncoordinated
+      - a security platform that doesn't govern its own estate is self-defeating
+      - DB access from other owners = unsolvable credential compartmentalisation
+    selected: false
+  - option: Dedicated instances owned by AI-SecOps stack
+    pros:
+      - clear ownership, backup and upgrade paths
+      - isolated networks
+      - no cross-contamination of credentials
+      - aligns with "Security First"
+    cons:
+      - more containers and memory on ai-secops01
+      - migration effort (days)
+    selected: true
+
+consequences:
+  positive:
+    - Clean security boundary story for the commercial product ("we pass our own policy").
+    - Backup/restore drills test OUR data only.
+    - Version upgrades are deliberate stack changes, reviewed via CODEOWNERS.
+  negative:
+    - ai-secops01 carries additional instances — RAM per process is modest (Postgres ≈0.3 GB and Qdrant ≈0.5 GB baseline; Ollama model-dependent ≥8 GB when enabled).
+    - One-time migration from any data already placed in shared instances.
+  mitigations:
+    - Compose profiles keep Ollama off (Phase 1 default) until needed.
+    - Node is sized in ROADMAP §4 — inference load is Phase 3-dependent.
+
+related:
+  adrs: [ADR-001]
+  policies: [POL-001]
+  standards: [STD-001]
+  risks: []
+  exceptions: [EX-001]
+  controls: []

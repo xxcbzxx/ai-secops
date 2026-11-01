@@ -1,0 +1,95 @@
+# ADR-003 — Ports-and-adapters product core; environments are deployments, not specs
+api_version: ai-secops.gov/v1
+kind: adr
+id: ADR-003
+version: "1.0.0"
+title: Ports-and-adapters product core; environments are deployments, not specs
+
+status: accepted
+decided_at: "2026-11-01"
+supersedes: []
+superseded_by: []
+
+deciders:
+  - role: security-architecture
+  - role: platform-lead
+
+context: >-
+  The first architecture draft of this platform was written around one specific
+  environment — the Proxmox/OpenWRT/n8n/Portainer/Cloudflare-Tunnel/Ollama
+  homelab of the reference deployment. Review verdict: "unusual, not
+  enterprise, home environment." A commercial product must not encode any
+  single site's tooling into its functional description; enterprise buyers
+  must recognise standard components (SSO/RBAC, ingress of choice, pluggable
+  providers, standard deployment tiers) — while the original dev environment
+  must keep working as the dogfooding site.
+
+decision: >-
+  Re-express the platform as a fixed product core plus adapter families
+  (docs/architecture.md §1/§3/§4):
+
+  1. FIXED CORE: web UI, ingest/registry API, deterministic engine, governance
+     sync, grounded assistant (Phase 3), owned Postgres/Qdrant data plane.
+  2. ADAPTER FAMILIES: ingress/auth, identity, LLM providers, governance
+     store, findings input, discovery, framework packs — selected by
+     configuration per deployment.
+  3. The homelab (ai-secops01) is demoted to "reference deployment": it
+     exercises default adapters (compose, tunnel ingress, local Ollama, Proxmox
+     collector) but contributes no product requirements.
+  4. Enterprise-standard commitments pulled INTO v1: RBAC role matrix in the
+     data model, audit events, adapter-configurable auth; OIDC adapter ships in
+     v1.x rather than "Phase 4 someday".
+
+options_considered:
+  - option: Product = the homelab stack, generalised by renaming tools
+    pros:
+      - zero rework of current docs
+      - instant demo value in the home env
+    cons:
+      - not legible as a product to enterprise buyers
+      - each target customer triggers re-architecture
+      - the "unusual, not enterprise" verdict stands
+    selected: false
+  - option: Kubernetes-first product
+    pros:
+      - enterprise respect
+      - HA patterns for free
+    cons:
+      - solo-dev support burden
+      - overkills SMB/SI
+      - slower wedge
+    selected: false
+  - option: Ports-and-adapters core + compose-first tier + reference deployment
+    pros:
+      - one product definition serves homelab→enterprise
+      - each enterprise gate becomes an adapter contract instead of a rewrite
+      - wedge stays small
+      - SaaS/Helm remain open options behind the same contracts
+    cons:
+      - adapter indirection adds design surface now (worth it)
+    selected: true
+
+consequences:
+  positive:
+    - Architecture reads as standard to enterprises (SSO/RBAC, HA path, ingress
+      choice, provider choice) without abandoning the working homelab.
+    - New environments are configuration, not new products; demo environments
+      cannot fork the core.
+    - The engine, data model, governance corpus (the actual differentiators)
+      are untouched by the pivot.
+  negative:
+    - Adapter contracts must be designed and tested like code — interfaces
+      cannot be shape-shifted quietly later.
+    - Some doc work duplicated (reference deployment runbook separate from
+      product docs).
+  mitigations:
+    - One adapter default per family for the wedge; alternates implemented on
+      customer demand only (ADR-004).
+    - "infrastructure/ keeps ONLY adapter-linked specifics; docs/ keeps the product definition."
+
+related:
+  policies: [POL-001]
+  standards: [STD-001]
+  risks: []
+  exceptions: []
+  controls: []

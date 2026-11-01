@@ -1,0 +1,94 @@
+# STD-001 — Secure Baseline for Edge-Exposed Services
+#
+#    Standards define WHAT GOOD LOOKS LIKE.
+#    Policies (POL-*) decide WHICH controls are mandatory.
+#    Controls listed here with no mapped policy feed the engine's
+#    `recommendation_only` outcome — visible advice, never enforcement.
+api_version: ai-secops.gov/v1
+kind: standard
+id: STD-001
+version: "1.0.0"
+title: Secure Baseline for Edge-Exposed Services
+
+state: current          # adopted | current | revised | retired
+body: internal
+based_on:               # informational provenance of derivation
+  - "CIS Controls v8.1 — Control 4 (Secure Configuration) / 13 (Network Monitoring)"
+  - "NIST SP 800-53 Rev.5 — SC-8, AC-6, AU-6 (informative mapping)"
+  - "Cloudflare Access reference architecture (internal note 2026-10)"
+
+summary: >-
+  Every service that accepts connections from outside the strict internal
+  boundary — including tunnel-routed and load-balanced frontends — must be
+  built and operated to this baseline. It defines the review level of
+  diligence for exposure, transport encryption, authentication, observability
+  and inventory truthfulness.
+
+applicability:
+  exposures: [public, edge_exposed]
+
+controls:
+  - id: EDGE-1
+    title: Encrypted transport
+    requirement: >-
+      All client-to-origin traffic is TLS 1.2+ with trusted certificates.
+      Plaintext terminates only behind an explicitly approved exception
+      with an accepted risk and a verified compensating control.
+    mapped_policies: [POL-001]
+    evidence_hints:
+      - TLS scan report ≤ 90 days old
+      - endpoint inventory TLS column
+
+  - id: EDGE-2
+    title: Authenticated edge access
+    requirement: >-
+      Edge-accessible services require authentication before reaching
+      application logic (identity provider at edge, application session, or
+      verified service token). Anonymous reachability is a finding.
+    mapped_policies: []          # → candidate POL-002 (recommendation_only until then)
+    evidence_hints:
+      - Access policy screenshot/export
+      - unauthenticated probe attempt result
+
+  - id: EDGE-3
+    title: Centralised session logging
+    requirement: >-
+      Edge sessions log identity, source, target and timestamp and are
+      retained ≥ 90 days in a boundary the service owner cannot alter.
+    mapped_policies: []          # → candidate POL-003
+    evidence_hints:
+      - log export configuration
+      - retention configuration
+
+  - id: EDGE-4
+    title: Inventory truthfulness
+    requirement: >-
+      Every edge-exposed service appears in the AI-SecOps inventory
+      (discovered OR imported) with owner, environment and exposure set
+      within 7 days of first exposure.
+    mapped_policies: []          # → candidate POL-004 (asset-model governance)
+    evidence_hints:
+      - collector freshness report
+      - interview with service owner
+
+  - id: EDGE-5
+    title: Hardened default configuration
+    requirement: >-
+      Exposed services run hardened configuration (admin surface disabled or
+      separately authenticated, debug endpoints off, dependency updates
+      scheduled). Drift from image/config baseline is reviewed monthly.
+    mapped_policies: [POL-001]   # partial — transport + maintenance overlap
+    evidence_hints:
+      - image digest pinning
+      - update schedule record
+
+owner: security-architecture
+effective_from: "2026-11-01"
+review: { cadence: annual, next: "2027-11-01" }
+
+related:
+  policies: [POL-001]
+  adrs: []
+  risks: [RSK-001]
+  exceptions: [EX-001]
+  controls: [CTL-001]

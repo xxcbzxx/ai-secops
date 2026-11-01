@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-secops.dev/schemas/policy.schema.json",
+  "title": "AI-SecOps governance artifact — POLICY",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["api_version", "kind", "id", "version", "title", "state",
+               "category", "authority", "owner", "effective_from", "statement",
+               "scope"],
+  "properties": {
+    "api_version": { "const": "ai-secops.gov/v1" },
+    "kind": { "const": "policy" },
+    "id": { "type": "string", "pattern": "^POL-[0-9]{3}$" },
+    "version": { "$ref": "#/$defs/semver" },
+    "title": { "type": "string", "minLength": 6 },
+    "state": { "enum": ["draft", "in_review", "active", "superseded", "retired"] },
+    "category": { "type": "string" },
+    "authority": { "type": "string" },
+    "owner": { "type": "string" },
+    "review_cadence": { "type": "string" },
+    "effective_from": { "$ref": "#/$defs/date" },
+    "review_due": { "$ref": "#/$defs/date" },
+    "approved_by": { "type": "array", "items": { "$ref": "#/$defs/approval" } },
+    "statement": { "type": "string", "minLength": 20 },
+    "scope": { "$ref": "#/$defs/selector" },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "grace_days": { "type": "integer", "minimum": 0, "maximum": 90 },
+        "grace_note": { "type": "string" }
+      }
+    },
+    "control_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["standard", "control"],
+        "properties": {
+          "standard": { "type": "string", "pattern": "^STD-[0-9]{3}$" },
+          "control": { "type": "string" },
+          "mapping": { "$ref": "#/$defs/mapping" }
+        }
+      }
+    },
+    "related": { "$ref": "#/$defs/related" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "enum": ["active", "superseded"] } } },
+      "then": { "required": ["approved_by"] }
+    }
+  ],
+  "$defs": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$" },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role"],
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "decided_at": { "$ref": "#/$defs/date" }
+      }
+    },
+    "mapping": { "enum": ["full", "partial", "aligned"] },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environments": { "type": "array", "items": {
+          "enum": ["lab", "staging", "production", "dmz", "management"] } },
+        "asset_kinds": { "type": "array", "items": {
+          "enum": ["host", "vm", "container", "network_device", "appliance",
+                   "site", "cluster", "cloud_account", "storage", "database",
+                   "application"] } },
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "exposures": { "type": "array", "items": {
+          "enum": ["internal", "edge_exposed", "public"] } },
+        "asset_uids": { "type": "array", "items": { "type": "string" } },
+        "tags": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "include_all": { "type": "array", "items": { "type": "string" } },
+            "include_any": { "type": "array", "items": { "type": "string" } },
+            "exclude":     { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "related": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policies":  { "type": "array", "items": { "type": "string" } },
+        "exceptions":{ "type": "array", "items": { "type": "string" } },
+        "risks":     { "type": "array", "items": { "type": "string" } },
+        "standards": { "type": "array", "items": { "type": "string" } },
+        "adrs":      { "type": "array", "items": { "type": "string" } },
+        "controls":  { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-secops.dev/schemas/finding.schema.json",
+  "title": "AI-SecOps ingest contract — FINDING (collectors, imports, generic producers)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "rule_id", "title", "severity"],
+  "properties": {
+    "source": { "type": "string", "minLength": 2 },
+    "rule_id": { "type": "string", "minLength": 2 },
+    "title": { "type": "string", "minLength": 5 },
+    "severity": { "$ref": "#/$defs/severity" },
+    "description": { "type": "string" },
+    "asset_uid": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{2,62}$" },
+    "service_uid": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{2,62}$" },
+    "evidence": { "type": "object" },
+    "raw": { "type": "object" },
+    "detected_at": { "type": "string", "format": "date-time" },
+    "fingerprint": { "type": "string", "minLength": 16 },
+    "note": {
+      "type": "string",
+      "description": "fingerprint is computed server-side when omitted; uniqueness key for idempotent re-posts"
+    }
+  },
+  "anyOf": [
+    { "required": ["asset_uid"] },
+    { "required": ["service_uid"] }
+  ],
+  "$defs": {
+    "severity": { "enum": ["informational", "low", "medium", "high", "critical"] }
+  }
+}

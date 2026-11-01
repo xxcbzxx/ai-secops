@@ -1,0 +1,93 @@
+# ADR-004 — The wedge: Compose-only tier, adapter defaults, all-options-by-contract
+api_version: ai-secops.gov/v1
+kind: adr
+id: ADR-004
+version: "1.0.0"
+title: The wedge — Compose-only deployment tier; one default adapter per family; every alternative stays contract-first
+
+status: accepted
+decided_at: "2026-11-01"
+supersedes: []
+superseded_by: []
+
+deciders:
+  - role: platform-lead
+    note: informed by stakeholder answers on deployment, auth, LLM, stores, frameworks, scope
+
+context: >-
+  Stakeholder decisions recorded 2026-11-01: deployment = Docker Compose first;
+  identity = "all should be supported"; LLM = "all of the above as options";
+  governance store = forge adapters **and** local stores (NAS/SharePoint);
+  frameworks = "all, whatever applies to the buyers' country"; findings = open
+  to any source, generic ingest now; effort = **solo developer, focused wedge**.
+  A single developer cannot build every supported combination — but the product
+  promise requires every option to be architecture-supported, not ignored.
+
+decision: >-
+  1. DEPLOYMENT: T1 = single-host `docker compose` is the only built tier until
+     traction. Helm (T2) and SaaS stay documented options behind the same
+     service contracts. NO Swarm/bash in product; the reference deployment may
+     still use whatever the host provides.
+  2. IDENTITY: adapter with shipped support for API keys (collectors, always)
+     and local accounts (UI default); OIDC SSO adapter contract designed now,
+     issued in v1.x — no buyer is told "SSO later" beyond that.
+  3. LLM: one adapter contract (OpenAI-compatible chat), three configured
+     providers — local Ollama (default), customer BYOK OpenAI-compatible
+     endpoint, Anthropic. Grounding contract identical for all; UI shows
+     whenever content would leave the customer boundary.
+  4. GOVERNANCE STORE: sync is pull-based over the standard artifact tree.
+     v1 default = filesystem bind-mount (covers NAS/SharePoint via folder-sync
+     into the mount, zero extra code). Forge adapters (GitHub/GitLab/Gitea/
+     Bitbucket) are contract-only in v1; implemented read-only adapters in
+     Phase 4 on demand. SharePoint Graph adapter only if demanded.
+  5. FRAMEWORKS: pack loader (data, not code). First shipped pack: CIS
+     Controls v8.1 mappings (titles/numbers/refs only — no verbatim CIS text
+     redistribution). NIST CSF/ISO 27001/region packs are data additions on
+     the same loader.
+  6. FINDINGS: generic JSON ingest contract is the only v1 source; scanner
+     adapters (Wazuh/OpenVAS/Trivy) become thin translators when demanded.
+
+options_considered:
+  - option: Build all requested options immediately (k8s + OIDC + forges + all frameworks + scanner adapters)
+    pros:
+      - matches the "all of the above" wish-list literally on day one
+    cons:
+      - solo developer cannot verify breadth
+      - everything shallow and broken
+    selected: false
+  - option: Build only the narrowest default; hide the rest
+    pros:
+      - smallest wedge
+    cons:
+      - contradicts the recorded decisions
+      - buyers with SSO/enterprise needs hit a dead end and rewrite anxiety repeats
+    selected: false
+  - option: One shipped default per family NOW; alternatives as designed contracts, implemented in demand order
+    pros:
+      - honest to the solo scope while keeping the multi-option promise architecturally real
+      - every phase can answer "what's supported, what's contracted, what's next"
+    cons:
+      - unbuilt contracted options stay visible debt, managed by the published "supported now vs contracted vs planned" table
+    selected: true
+
+consequences:
+  positive:
+    - Every "support everything" decision has a place in the architecture
+      instead of becoming silent tech debt.
+    - The wedge stays one working tier with defaults, demoable in days.
+    - Alternates arrive as adapter implementations — additive, no re-architecture.
+  negative:
+    - Contract-first adapters add design burden with no immediate behaviour.
+    - v2/v3 buyers might wait for their preferred option (e.g. OIDC GA in v1.x).
+  mitigations:
+    - Published "supported now vs contracted vs planned" table in docs.
+    - Demand polling — alternatives are implemented strictly in demand order.
+    - ROADMAP Phase 4/5 carry the contracted-but-unbuilt list explicitly.
+
+related:
+  adrs: [ADR-003]
+  policies: [POL-001]
+  standards: [STD-001]
+  risks: []
+  exceptions: []
+  controls: []

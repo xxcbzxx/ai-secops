@@ -1,0 +1,101 @@
+# ADR-001 — Git-first governance with the two-plane data model
+api_version: ai-secops.gov/v1
+kind: adr
+id: ADR-001
+version: "1.0.0"
+title: Git-first governance with the two-plane data model
+
+status: accepted        # proposed | accepted | superseded | rejected | deprecated
+decided_at: "2026-11-01"
+supersedes: []
+superseded_by: []
+
+deciders:
+  - role: ciso-delegate
+  - role: security-architecture
+  - role: platform-lead
+
+context: >-
+  The original mission states "Policies, Exceptions, Risks, Standards and ADRs
+  are stored in Git. Git is the source of truth. Database is derived from Git."
+  Taken literally as a global rule, this fails for operational telemetry
+  (assets, services, findings, threat entries): discovery mutates this data
+  hourly through collectors; committing that noise to Git would drown the
+  review process, and PRs cannot approve what machines observe. The inverse
+  mistake — governing everything from a database UI — is how GRC data drifts:
+  nobody reviews spreadsheet edits, whether data is in a table or a wiki row
+  or a Git blob, and no provenance exists for commercial audit.
+
+decision: >-
+  Introduce the two-plane model (governance plane in Git, operational plane
+  in PostgreSQL) as the platform's canonical data architecture:
+
+  1. GOVERNANCE PLANE (Git, this repo): policies, exceptions, risks, standards,
+     ADRs, compensating controls. Human-decided content. Schema-validated YAML,
+     PR-based change, mandatory human approvals, content hashes as provenance.
+     PostgreSQL holds a REBUILDABLE PROJECTION of this plane (read-only to
+     applications); deleting and re-syncing the projection must be always safe.
+
+  2. OPERATIONAL PLANE (PostgreSQL primary): assets, services, software
+     inventories, findings, evaluations, threat entries, reports, audit trail.
+     Machine-generated data from collectors/imports; never requires PRs.
+
+  Bridges between planes: assets/objects in the operational plane may carry
+  optional DECLARED enrichment ("asset cards") as YAML in the repository in a
+  later phase, merged read-only into the DB during sync. The evaluation engine
+  joins both planes but writes decision records only to the operational plane.
+
+options_considered:
+  - option: Database-as-source-of-truth (CRUD UI writes policies directly)
+    pros:
+      - fastest to demo, familiar workflow tooling
+      - no schema drift between artifact files and DB rows
+    cons:
+      - no review/approval workflow, no diff-able history, no code review of
+        governance intent; trust rests on the tool not the content
+      - commercial-grade audit trail is harder to reconstruct than from Git
+      - vendor-destroying single point of truth if DB is corrupted
+    selected: false
+
+  - option: Literal Git-everything (assets & findings also committed to files)
+    pros:
+      - single plane, simplest mental model, maximal provenance
+    cons:
+      - discovery churn (dozens of changes/day) makes review noise unmanageable
+      - machine-generated content requires approvals it does not need
+      - Git is not a write-optimised high-churn telemetry store
+    selected: false
+
+  - option: Two-plane model — Git-governance, DB-operational
+    pros:
+      - human decisions get review, versioning, 4-eyes discipline (Git)
+      - machine telemetry gets write-heavy ID generation (DB — natural fit)
+      - projections are rebuildable; both planes auditable on their own terms
+      - clean bridge for declared enrichment (asset cards) later
+    cons:
+      - two sources of truth must be joined at evaluation time (engine)
+      - sync service adds a moving part (idempotent, observable, tested)
+    selected: true
+
+consequences:
+  positive:
+    - Every governance decision has a reviewable, timestamped, signed context.
+    - Database can be wiped and re-derived for the governance plane at any time.
+    - The review matrix in CONTRIBUTING governs *content*, not just code.
+  negative:
+    - The sync service becomes a critical reliability component (monitoring
+      sync_state is mandatory from Phase 2).
+    - Applications must never write governance state directly — needs guardrails
+      (DB roles, code reviews, possibly DB triggers to block mutation of gov
+      tables outside sync).
+  mitigations:
+    - DB roles — only the sync service holds write grants on governance tables.
+    - Compliance canaries — nightly re-validation that projection Git == Git artefacts; drift pages platform-lead.
+    - Phase 2 acceptance criterion — database fully rebuildable from Git (ROADMAP §3).
+
+related:
+  policies: [POL-001]
+  standards: [STD-001]
+  risks: [RSK-001]
+  exceptions: [EX-001]
+  controls: []

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-secops.dev/schemas/asset.schema.json",
+  "title": "AI-SecOps ingest contract — ASSET/SERVICE/SOFTWARE (collectors & imports)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_uid", "kind", "name", "environment", "exposure",
+               "criticality", "lifecycle", "source"],
+  "properties": {
+    "asset_uid": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{2,62}$" },
+    "kind": { "$ref": "#/$defs/asset_kind" },
+    "name": { "type": "string", "minLength": 2 },
+    "environment": { "$ref": "#/$defs/environment" },
+    "exposure": { "$ref": "#/$defs/exposure" },
+    "criticality": { "$ref": "#/$defs/criticality" },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "source": { "enum": ["discovered", "imported", "declared"] },
+    "owner_team": { "type": "string" },
+    "platform": { "type": "string" },
+    "provider": { "type": "string" },
+    "parent_asset_uid": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object" },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "service_uid": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{2,62}$" },
+          "name": { "type": "string", "minLength": 2 },
+          "kind": { "type": "string" },
+          "exposure": { "$ref": "#/$defs/exposure" },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["proto", "port"],
+              "properties": {
+                "proto": { "enum": ["tcp", "udp", "http", "https"] },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "addr": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "software": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product"],
+        "properties": {
+          "product": { "type": "string", "minLength": 2 },
+          "vendor": { "type": "string" },
+          "version": { "type": "string" },
+          "cpe": { "type": "string" },
+          "purl": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "asset_kind": {
+      "enum": ["host", "vm", "container", "network_device", "appliance",
+               "site", "cluster", "cloud_account", "storage", "database",
+               "application"]
+    },
+    "environment": { "enum": ["lab", "staging", "production", "dmz", "management"] },
+    "exposure": { "enum": ["internal", "edge_exposed", "public"] },
+    "criticality": { "enum": ["tier1", "tier2", "tier3", "tier4"] },
+    "lifecycle": { "enum": ["planned", "active", "decommissioning", "decommissioned"] }
+  }
+}

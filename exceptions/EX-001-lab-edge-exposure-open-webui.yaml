@@ -1,0 +1,68 @@
+# EX-001 — Lab edge exposure for Open WebUI on ai-secops01
+#
+#    Exception anatomy (binding):
+#      policy_ref   which policy is being deviated from
+#      risk_ref     WHICH accepted risk covers this deviation (mandatory)
+#      approvers    named approver, must NOT be requested_by (4-eyes)
+#      valid_to     hard expiry; renewal is a NEW PR, never a date edit
+#      compensating_controls  verified evidence keeping residual risk low
+api_version: ai-secops.gov/v1
+kind: exception
+id: EX-001
+version: "1.0.0"
+title: Lab edge exposure for Open WebUI on ai-secops01
+
+policy_ref:
+  id: POL-001
+  version: "1.0.0"
+risk_ref:
+  id: RSK-001
+
+requested_by:
+  name: (Infrastructure Lead — to be named)
+  role: infrastructure-lead
+requested_at: "2026-11-01"
+
+status: active
+valid_from: "2026-11-02"
+valid_to: "2027-01-30"        # 90-day cap per governance rules
+review_before: "2027-01-16"   # renewal/termination decision due date
+
+justification: >-
+  Open WebUI is temporarily exposed through the edge plane for evaluation of
+  the grounded assistant (Phase 3 groundwork). Built-in TLS/OIDC termination
+  in the service is not yet configured, while Cloudflare Access already
+  provides identity-gated TLS at the boundary. Terminating TLS directly at
+  the service is scheduled as part of the Phase 2 hardening sprint and is
+  blocked only by shared cluster maintenance, not by a defect.
+
+conditions:
+  - Exposed only via the existing Cloudflare Tunnel — no published ports on
+    the VM; direct access from the internal network is forbidden for this
+    service while the exception is active.
+  - Cloudflare Access policy must remain attached (identity required, logs
+    exported weekly to the security team).
+  - Not used for external users or production client data sessions.
+  - Any change to the tunnel origin configuration voids this exception.
+
+compensating_controls: [CTL-001]
+
+scope:
+  asset_uids: [ai-secops01]
+  services: [open-webui]
+  exposures: [edge_exposed]
+  environments: []      # wildcard; the service scope is the binding constraint
+
+approvers:
+  - name: (Security Architect — to be named)
+    role: security-architecture
+    decision: approved
+    decided_at: "2026-11-01"
+    comment: >-
+      Approved for one review cycle. CTL-001 evidence verified on this date.
+      Any reconfiguration of the tunnel requires a new exception.
+  - name: (CISO delegate — to be named)
+    role: ciso-delegate
+    decision: approved
+    decided_at: "2026-11-01"
+    comment: Consistent with RSK-001 acceptance and appetite.

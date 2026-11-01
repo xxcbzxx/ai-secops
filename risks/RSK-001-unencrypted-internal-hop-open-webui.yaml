@@ -1,0 +1,87 @@
+# RSK-001 — Unencrypted internal hop for edge-exposed Open WebUI
+#
+#    Risk anatomy (binding):
+#      assessment/inherent    likelihood × impact before controls
+#      existing_controls      CTL ids with verified evidence
+#      residual               likelihood × impact after controls
+#      acceptance             named human decision + expiry (never implied)
+api_version: ai-secops.gov/v1
+kind: risk
+id: RSK-001
+version: "1.0.0"
+title: Unencrypted internal hop for edge-exposed Open WebUI
+
+status: accepted        # identified | under_assessment | pending_decision | accepted | accepted_with_controls | mitigated | transferred | closed
+category: data_in_transit
+owner: infrastructure-lead
+
+description: >-
+  Open WebUI on ai-secops01 terminates its connection at the Cloudflare edge,
+  while the internal hop from tunnel origin to the service container is
+  plaintext HTTP inside the VM. If the VM network boundary is bypassed
+  (compromised container escaping to the VM stack, misconfigured port
+  publish, or a rogue workload on the same host), an attacker could observe
+  or alter traffic containing infrastructure configuration context — the
+  exact knowledge an attacker needs to map the estate.
+
+asset_refs: [ai-secops01]
+service_refs: [open-webui]
+
+assessment:             # inherent (before controls)
+  likelihood: 2         # 1-5: requires VM-level foothold or config error
+  impact: 4             # 1-5: exposes platform configuration & context
+  score: 8              # likelihood × impact
+  band: medium          # 1-4 low, 5-9 medium, 10-14 high, 15-25 critical
+
+threat_statements:
+  - Internal lateral movement reaching the ai-secops01 VM stack.
+  - Accidental port publication exposing the plaintext origin.
+  - Cloudflare origin compromise (tunnel credential theft).
+
+existing_controls: [CTL-001]
+
+mitigation_plan:
+  - action: >-
+      Terminate TLS directly at Open WebUI with OIDC SSO and disable the
+      plaintext origin listener; tunnel becomes TCP-internal only.
+    owner: platform-lead
+    target_date: "2027-01-31"
+    status: planned     # planned | in_progress | done | blocked
+  - action: Reject/config-audit any docker-compose port publish on the data/ai networks (CI guard).
+    owner: platform-lead
+    target_date: "2026-12-15"
+    status: in_progress
+
+residual:               # after existing controls + CTL-001
+  likelihood: 1
+  impact: 3
+  score: 3
+  band: low
+
+appetite: within_appetite   # accepted (low residual) for the lab environment
+appetite_note: >-
+  Residual is within appetite while duration ≤ 90 days AND CTL-001 stays
+  verified (quarterly) AND the mitigation completes. Any three-letter
+  failure moves this to above_appetite and voids EX-001.
+
+acceptance:             # the human decision record — required for status: accepted
+  state: accepted_with_controls
+  decision_date: "2026-11-01"
+  accepted_by:
+    name: (CISO delegate — to be named)
+    role: ciso-delegate
+  rationale: >-
+    Residual risk is low for a lab environment with identity-gated ingress,
+    and the mitigation is scheduled within the same window as EX-001.
+  valid_until: "2027-01-30"
+  review_cadence: quarterly
+  monitoring:
+    - Weekly review of Cloudflare Access logs for anomaly detection.
+    - CI check that no ports are published by ai-secops stacks (E2E inventories).
+
+related:
+  policies: [POL-001]
+  exceptions: [EX-001]
+  controls: [CTL-001]
+  standards: [STD-001]
+  adrs: []

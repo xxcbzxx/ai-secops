@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-secops.dev/schemas/adr.schema.json",
+  "title": "AI-SecOps governance artifact — ADR (architecture decision record)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["api_version", "kind", "id", "version", "title", "status",
+               "context", "decision", "options_considered", "consequences"],
+  "properties": {
+    "api_version": { "const": "ai-secops.gov/v1" },
+    "kind": { "const": "adr" },
+    "id": { "type": "string", "pattern": "^ADR-[0-9]{3}$" },
+    "version": { "$ref": "#/$defs/semver" },
+    "title": { "type": "string", "minLength": 8 },
+    "status": { "enum": ["proposed", "accepted", "superseded", "rejected", "deprecated"] },
+    "decided_at": { "$ref": "#/$defs/date" },
+    "supersedes": { "type": "array", "items": { "type": "string" } },
+    "superseded_by": { "type": "array", "items": { "type": "string" } },
+    "deciders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role"],
+        "properties": {
+          "role": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "context": { "type": "string", "minLength": 40 },
+    "decision": { "type": "string", "minLength": 40 },
+    "options_considered": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["option", "pros", "cons", "selected"],
+        "properties": {
+          "option": { "type": "string", "minLength": 10 },
+          "pros": { "type": "array", "items": { "type": "string" } },
+          "cons": { "type": "array", "items": { "type": "string" } },
+          "selected": { "type": "boolean" }
+        }
+      }
+    },
+    "consequences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["positive", "negative"],
+      "properties": {
+        "positive": { "type": "array", "items": { "type": "string" } },
+        "negative": { "type": "array", "items": { "type": "string" } },
+        "mitigations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "related": { "$ref": "#/$defs/related" }
+  },
+  "$defs": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$" },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "related": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policies":  { "type": "array", "items": { "type": "string" } },
+        "exceptions":{ "type": "array", "items": { "type": "string" } },
+        "risks":     { "type": "array", "items": { "type": "string" } },
+        "standards": { "type": "array", "items": { "type": "string" } },
+        "adrs":      { "type": "array", "items": { "type": "string" } },
+        "controls":  { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

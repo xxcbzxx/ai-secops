@@ -1,0 +1,74 @@
+# POL-001 — Encrypted transport for edge-exposed services
+#
+#    Lifecycle (docs/governance-model.md):
+#    draft -> in_review -> active -> superseded/retired
+#    Major version changes (intent) always re-enter in_review.
+api_version: ai-secops.gov/v1
+kind: policy
+id: POL-001
+version: "1.0.0"
+title: Encrypted transport for edge-exposed services
+
+state: active
+category: cryptography
+authority: office-of-the-ciso
+owner: security-architecture
+review_cadence: annual
+
+effective_from: "2026-11-01"
+review_due: "2027-11-01"
+
+approved_by:
+  - name: (CISO delegate — to be named at adoption)
+    role: ciso-delegate
+    decided_at: "2026-11-01"
+
+statement: >-
+  Every service whose exposure is public or edge_exposed must be reachable
+  exclusively over TLS 1.2 or better terminated at a trusted boundary
+  (service itself, load balancer, or Cloudflare edge), AND must be accessible
+  only through an authenticated path. Plaintext HTTP for edge-exposed or
+  public services is prohibited unless a valid, unexpired exception exists
+  that links an accepted risk and a verified compensating control.
+
+scope:
+  # Empty lists act as wildcards for that dimension.
+  exposures: [public, edge_exposed]
+  environments: []
+  asset_kinds: []
+  platforms: []
+  asset_uids: []
+  tags:
+    include_all: []
+    include_any: []
+    exclude: []
+
+requirement:
+  evidence:
+    - Endpoint inventory (collector output) marks TLS termination for every
+      edge-exposed or public service.
+    - TLS scan (≤ 90 days old) shows protocol ≥ TLS 1.2 and no plaintext port
+      reachable for the same service.
+    - Path to the service requires authentication at edge or origin.
+  grace_days: 14
+  grace_note: >-
+    New edge exposures may operate plaintext for at most 14 days. After that
+    the engine outcome becomes `violation` even if a draft exception is
+    pending approval.
+
+# Mapping to standards gives the engine/AI the mandatory citation trail.
+# Standards controls without a mapped policy later feed `recommendation_only`.
+control_refs:
+  - standard: STD-001
+    control: EDGE-1
+    mapping: full
+  - standard: STD-001
+    control: EDGE-5
+    mapping: partial
+
+related:
+  policies: []        # superseded/policy-conflict references live here
+  risks: [RSK-001]
+  exceptions: [EX-001]
+  standards: [STD-001]
+  adrs: []
