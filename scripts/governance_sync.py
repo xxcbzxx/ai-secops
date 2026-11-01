@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import date, datetime
@@ -42,14 +43,16 @@ except ModuleNotFoundError as exc:  # pragma: no cover - container bakes deps
 ROOT = Path(os.environ.get("GOV_ROOT", "/governance")).resolve()
 STORE_ID = os.environ.get("STORE_ID", "main")
 
-# class prefix, folder, schema file
+# class prefix, folder, schema file — projection order respects the FK graph
+# of 002-schema.sql: exceptions rows reference policies AND risks, so EX is
+# written last (single transaction aborts everything on violation).
 PAIRS = [
     ("POL", "policies", "policy.schema.json"),
-    ("EX", "exceptions", "exception.schema.json"),
     ("RSK", "risks", "risk.schema.json"),
     ("STD", "standards", "standard.schema.json"),
     ("ADR", "architecture", "adr.schema.json"),
     ("CTL", "controls", "compensating-control.schema.json"),
+    ("EX", "exceptions", "exception.schema.json"),
 ]
 
 
@@ -64,7 +67,32 @@ def to_date(value) -> date | None:
 
 
 def git_state() -> tuple[str | None, str]:
-    """(head_commit, branch) — both degrade gracefully outside a checkout."""
+    """(head_commit, branch) — degrades gracefully when git or .git are absent.
+
+    The job container deliberately ships WITHOUT the git binary, so the HEAD
+    commit is read directly from .git files when available (loose or packed).
+    """
+    gitdir = ROOT / ".git"
+    if shutil.which("git") is None:
+        head_file = gitdir / "HEAD"
+        if not head_file.is_file():
+            return None, "main"
+        text = head_file.read_text(encoding="utf-8").strip()
+        if text.startswith("ref:"):
+            ref = text[4:].strip()
+            branch = ref.rsplit("/", 1)[-1] or "main"
+            loose = gitdir / ref
+            if loose.is_file():
+                return loose.read_text(encoding="utf-8").strip() or None, branch
+            packed = gitdir / "packed-refs"
+            if packed.is_file():
+                for line in packed.read_text(encoding="utf-8").splitlines():
+                    parts = line.split()
+                    if len(parts) == 2 and parts[1] == ref:
+                        return parts[0], branch
+            return None, branch
+        return (text or None), "main"
+
     def run(*args: str) -> str:
         try:
             p = subprocess.run(["git", "-C", str(ROOT), *args],
@@ -217,7 +245,7 @@ def proj_risk(doc: dict, p: dict) -> tuple[str, dict]:
             appetite, appetite_note, acceptance, review, related, source_path,
             source_commit, content_sha256, synced_at)
         VALUES (%(u)s, %(v)s, %(t)s, %(st)s, %(cat)s, %(ow)s, %(de)s, %(ar)s,
-            %(sr)s, %(as)s, %(ts)s, %(ec)s, %(mp)s, %(re)s, %(ap)s, %(an)s,
+            %(sr)s, %(asm)s, %(ts)s, %(ec)s, %(mp)s, %(re)s, %(ap)s, %(an)s,
             %(ac)s, %(rv)s, %(rel)s, %(pth)s, %(cm)s, %(sh)s, now())
         ON CONFLICT (risk_uid) DO UPDATE SET
             version=EXCLUDED.version, title=EXCLUDED.title,
@@ -240,7 +268,7 @@ def proj_risk(doc: dict, p: dict) -> tuple[str, dict]:
         cat=doc["category"], ow=doc["owner"], de=doc["description"],
         ar=[str(x) for x in (doc.get("asset_refs") or [])],
         sr=[str(x) for x in (doc.get("service_refs") or [])],
-        as_=J(doc.get("assessment") or {}),
+        asm=J(doc.get("assessment") or {}),
         ts=[str(x) for x in (doc.get("threat_statements") or [])],
         ec=J(doc.get("existing_controls") or []),
         mp=J(doc.get("mitigation_plan") or []),
