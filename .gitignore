@@ -1,0 +1,45 @@
+# --- Secrets & local environment ---
+.env
+.env.*
+!.env.example
+secrets/
+infrastructure/secrets/
+*.pem
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# --- Node / frontend ---
+node_modules/
+.vite/
+
+# --- Databases & dumps (never commit exfiltrated data) ---
+*.sql.gz
+*.dump
+*.bak
+*.ndjson
+data/
+pgdata/
+qdrant-store/
+
+# --- Evidence exports stay outside the corpus (referenced by controls) ---
+evidence/
+
+# --- OS & editor noise ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
