@@ -1,0 +1,137 @@
+# AI-SecOps — T1 deployment (ADR-004): single host, docker compose.
+# Product rule: data + ai networks are internal-only; no published ports.
+# The web UI/api (Phase 2) will join `edge`; the ingress (your reverse proxy
+# or Cloudflare Tunnel) is the only path from outside.
+#
+#   docker compose --env-file .env up -d            # core (data plane ready)
+#   docker compose --profile ai  up -d              # + Ollama
+#   docker compose --profile chat up -d             # + Open WebUI (reference UI)
+#
+name: ai-secops
+
+x-logging: &default-logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  # ---------------------------------------------------------------- data plane
+  postgres:
+    image: postgres:17-alpine            # pin by digest before first customer deploy
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_secops}
+      POSTGRES_USER: ${POSTGRES_USER:-ai_secops}
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      TZ: ${TZ:-UTC}
+    secrets:
+      - pg_password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro   # 001/002/003 auto-apply on first init
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_secops} -d ${POSTGRES_DB:-ai_secops}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    # No `ports:` — reachable only on the `data` network (ADR-002).
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4         # vector store for the Phase 3 corpus
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?set QDRANT_API_KEY in .env}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    # No `ports:`.
+
+  # ------------------------------------------------------------- AI plane (opt)
+  ollama:
+    image: ollama/ollama:latest          # default LLM provider (adapter contract)
+    restart: unless-stopped
+    profiles: ["ai"]
+    environment:
+      TZ: ${TZ:-UTC}
+      OLLAMA_KEEP_ALIVE: 24h
+    volumes:
+      - ollama_data:/root/.ollama
+    networks: [ai]
+    logging: *default-logging
+    # No `ports:`. Training/inference bound to this host only (Local First).
+
+  # ------------------------------------------------------- reference chat UI
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    restart: unless-stopped
+    profiles: ["chat"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-UTC}
+      OPENAI_API_BASE_URL: http://ollama:11434/v1   # ignored if the `ai` profile is off
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?set WEBUI_SECRET_KEY in .env}
+    volumes:
+      - openwebui_data:/app/backend/data
+    networks: [edge, ai]
+    logging: *default-logging
+    # Exposed ONLY through your ingress: attach the tunnel/proxy container to
+    # the same `edge` network and route (see infrastructure/README.md §tunnel).
+
+  # ------------------------------------------------- governance sync (one-shot)
+  # Phase 2 workstream 2.1 — THE ONLY writer of gov.* rows (ADR-001; least
+  # privilege tightening continues on the role matrix).
+  #   docker compose --env-file .env --profile sync run --rm governance-sync
+  governance-sync:
+    build:
+      context: ..
+      dockerfile: infrastructure/governance-sync/Dockerfile
+    profiles: ["sync"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-ai_secops}
+      PGUSER: ${POSTGRES_USER:-ai_secops}
+      PGPASSWORD_FILE: /run/secrets/pg_password
+      GOV_ROOT: /governance
+      STORE_ID: main
+    secrets: [pg_password]
+    volumes:
+      - ..:/governance:ro
+    networks: [data]
+    logging: *default-logging
+    # No ports — the sync job lives on the data network only.
+
+networks:
+  edge:
+    name: ai-secops_edge
+    attachable: true     # your ingress/tunnel joins this network and routes
+  data:
+    name: ai-secops_data
+    internal: true       # cannot touch the internet — Postgres/Qdrant stay in
+  ai:
+    name: ai-secops_ai
+    internal: true       # Ollama model pulls: see README "offline pulls"
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt      # single line; never commit
+
+volumes:
+  pg_data:
+  qdrant_data:
+  ollama_data:
+  openwebui_data:
