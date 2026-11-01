@@ -1,0 +1,7 @@
+# AI-SecOps — governance-corpus validation + platform self-check dependencies.
+# CI installs these (workflow: validate-governance.yml). Hosts can install them
+# for local parity with the CI gate:
+#   pip3 install --user --break-system-packages -r requirements.txt
+pyyaml>=6.0.1
+jsonschema>=4.21.0
+check-jsonschema>=0.28.0

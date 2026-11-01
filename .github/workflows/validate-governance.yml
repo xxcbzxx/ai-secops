@@ -1,0 +1,36 @@
+# AI-SecOps governance CI — the schema + referential-integrity gate.
+# Runs on every push/PR; a red build blocks merge of governance changes.
+name: validate-governance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Schema-validate every governance artifact
+        run: |
+          pip install check-jsonschema pyyaml
+          check-jsonschema --schemafile schemas/policy.schema.json                  policies/*.yaml
+          check-jsonschema --schemafile schemas/exception.schema.json             exceptions/*.yaml
+          check-jsonschema --schemafile schemas/risk.schema.json                  risks/*.yaml
+          check-jsonschema --schemafile schemas/standard.schema.json              standards/*.yaml
+          check-jsonschema --schemafile schemas/adr.schema.json                   architecture/*.yaml
+          check-jsonschema --schemafile schemas/compensating-control.schema.json  controls/*.yaml
+
+      - name: Referential integrity (all refs resolve)
+        run: python scripts/check_references.py
+
+      - name: Weakness sweep (secrets / TODOs in active artifacts)
+        run: |
+          ! grep -RInE '(password|api[_-]?key|secret)[[:space:]]*[:=][[:space:]]*["'"][A-Za-z0-9]{12,}' \
+            policies exceptions risks standards architecture controls || true

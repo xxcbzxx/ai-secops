@@ -1,0 +1,21 @@
+# AI-SecOps code owners. Governance content is additionally gated by the
+# review matrix in CONTRIBUTING.md and CI (validate-governance workflow).
+# Format: https://docs.github.com/en/repositories/managing-your-repositorys-
+# settings-and-features/customizing-your-repository/about-code-owners
+
+*                                       @xxcbzxx
+
+# Governance corpus — every artifact change must be owner-reviewed.
+/policies/                              @xxcbzxx
+/exceptions/                            @xxcbzxx
+/risks/                                 @xxcbzxx
+/standards/                             @xxcbzxx
+/architecture/                          @xxcbzxx
+/controls/                             @xxcbzxx
+
+# Data plane + deployment surfaces.
+/infrastructure/                        @xxcbzxx
+/docs/                                  @xxcbzxx
+
+# CI itself is crown-jewel: changes to the gate need explicit review.
+/.github/                               @xxcbzxx
