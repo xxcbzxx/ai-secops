@@ -75,7 +75,7 @@ The wedge for `docker compose up` customers:
 
 | Workstream | Deliverables | Exit criteria |
 |---|---|---|
-| Governance sync | Store adapter v1 (**filesystem only**): validated projection into Postgres; provenance stamps (path/hash/commit); idempotent; drift detector | DB fully rebuildable from the artifact tree; safe wipe-and-resync |
+| Governance sync ✅ | Store adapter v1 (**filesystem only**): validated projection into Postgres; provenance stamps (path/hash/commit); idempotent; drift detector | ✅ Verified on ai-secops01 (2026-11-01): rebuildable gov plane, safe wipe-and-resync, none-drift parity |
 | Generic ingest API | FastAPI: assets/services/software/findings upsert by fingerprint; scoped API keys | Contract tests green; external JSON producers work |
 | Engine v1 | Deterministic pipeline per `docs/policy-engine.md`; decision records in DB; golden tests from `test-data/` | All five required outcomes + `not_applicable`; reproducible records |
 | CIS pack skeleton | Loader + starter pack (mappings only, per-core controls) + 1 mapped policy beyond POL-001 | A policy citing the pack evaluates end-to-end |
