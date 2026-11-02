@@ -1,5 +1,6 @@
-# AI-SecOps governance CI — the schema + referential-integrity gate.
-# Runs on every push/PR; a red build blocks merge of governance changes.
+# AI-SecOps governance CI — the schema + referential-integrity gate, plus the
+# weakness sweep (scripts/weakness_sweep.py): secrets and TODO markers never
+# ship in the governance corpus. Runs on every push/PR; red blocks merge.
 name: validate-governance
 
 on:
@@ -30,7 +31,8 @@ jobs:
       - name: Referential integrity (all refs resolve)
         run: python scripts/check_references.py
 
+      - name: Sweep self-test (detectors proven before they police)
+        run: python scripts/weakness_sweep.py --self-test
+
       - name: Weakness sweep (secrets / TODOs in active artifacts)
-        run: |
-          ! grep -RInE '(password|api[_-]?key|secret)[[:space:]]*[:=][[:space:]]*["'"][A-Za-z0-9]{12,}' \
-            policies exceptions risks standards architecture controls || true
+        run: python scripts/weakness_sweep.py
