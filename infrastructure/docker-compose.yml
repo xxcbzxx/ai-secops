@@ -6,6 +6,7 @@
 #   docker compose --env-file .env up -d            # core (data plane ready)
 #   docker compose --profile ai  up -d              # + Ollama
 #   docker compose --profile chat up -d             # + Open WebUI (reference UI)
+#   docker compose --profile api up -d              # + generic ingest API (2.2)
 #
 name: ai-secops
 
@@ -25,6 +26,7 @@ services:
       TZ: ${TZ:-UTC}
     secrets:
       - pg_password
+      - pg_ingest_password    # 004-service-roles.sh attaches the ingest LOGIN role
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro   # 001/002/003 auto-apply on first init
@@ -115,6 +117,34 @@ services:
     logging: *default-logging
     # No ports — the sync job lives on the data network only.
 
+  # ---------------------------------------------- generic ingest API (Phase 2.2)
+  # THE ONLY sanctioned writer of ops.* rows: assets/services/software/findings
+  # as idempotent JSON upserts, scoped bearer keys, one audit record per write.
+  # gov.* stays READ-ONLY for this role by design (ADR-002; see 004 roles).
+  #   docker compose --env-file .env --profile api up -d ingest-api
+  ingest-api:
+    build:
+      context: ..
+      dockerfile: infrastructure/ingest-api/Dockerfile
+    profiles: ["api"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-ai_secops}
+      PGUSER: ai_secops_ingest
+      PGPASSWORD_FILE: /run/secrets/pg_ingest_password
+      INGEST_TOKENS_FILE: /run/secrets/ingest_tokens
+      TZ: ${TZ:-UTC}
+    secrets: [pg_ingest_password, ingest_tokens]
+    networks: [edge, data]
+    logging: *default-logging
+    # No `ports:` — clients reach it through YOUR ingress attached to `edge`,
+    # or from containers on `data`. Probes: docs/ingest-api.md §1.
+
 networks:
   edge:
     name: ai-secops_edge
@@ -129,6 +159,10 @@ networks:
 secrets:
   pg_password:
     file: ./secrets/pg_password.txt      # single line; never commit
+  pg_ingest_password:
+    file: ./secrets/pg_ingest_password.txt  # hex only (004 needs unquoted SQL)
+  ingest_tokens:
+    file: ./secrets/ingest_tokens.txt    # name:token:scopes, one per line
 
 volumes:
   pg_data:

@@ -18,6 +18,9 @@ What it checks (the "thing" the platform must verify to call itself ready):
      integrity (CI parity, runs on the VM when python3 + deps are present).
   E. BACKUPS   — a pg_dump archive exists in backups/ (drill gate).
 
+   F. INGEST    — generic ingest API healthy, keys configured, least-privilege
+      role exists (Phase 2.2; WARN + guide if the `api` profile is off).
+
 Exit code: 0 = ready, 1 = not ready (CI-style). Individual checks degrade to
 WARN where appropriate (optional features) but FAIL on core violations.
 """
@@ -189,6 +192,29 @@ def check_backups() -> bool:
     return record("E.backups", OK, f"latest: {dumps[-1].name}")
 
 
+# --------------------------------------------------------------------------- F
+def check_ingest() -> bool:
+    """F. INGEST — the ops-plane write path is alive (Phase 2, workstream 2.2)."""
+    code, out = run(["docker", "inspect", "-f", "{{.State.Health.Status}}",
+                     "ai-secops-ingest-api-1"])
+    if code != 0 or out.strip() != "healthy":
+        return record("F.ingest.api", WARN,
+                      f"not up (profile 'api' off) — health={out or 'absent'}; "
+                      "start: docker compose --env-file .env --profile api up -d")
+    ok = record("F.ingest.api", OK, out.strip())
+    code, out = docker_compose("exec", "-T", "ingest-api", "python", "-c",
+        "import urllib.request as u;"
+        "print(u.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read().decode())")
+    ok &= record("F.ingest.healthz",
+                 OK if code == 0 and ('"status":"ok"' in out or '"status": "ok"' in out) else FAIL,
+                 (out.replace(chr(10), " ") or "no output")[:160])
+    code, out = psql("SELECT count(*) FROM pg_roles "
+                     "WHERE rolname = 'ai_secops_ingest' AND rolcanlogin;")
+    ok &= record("F.ingest.role", OK if code == 0 and out == "1" else FAIL,
+                 f"ai_secops_ingest login role: {out or '0'}")
+    return ok
+
+
 def main() -> int:
     results.clear()
     check_containers()
@@ -196,6 +222,7 @@ def main() -> int:
     check_isolation()
     check_corpus()
     check_backups()
+    check_ingest()
 
     fmt = (sys.argv[1:2] + [None])[0]
     if fmt == "--json":
