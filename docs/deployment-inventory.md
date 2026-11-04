@@ -179,3 +179,43 @@ docker inspect -f '{{(index .NetworkSettings.Networks "ai-secops_edge").IPAddres
 
 No persistent ingress or public endpoint was added. API writes still require a
 scoped collector credential; do not experiment with write endpoints on live data.
+
+## Follow-up verification — 5 November 2026
+
+GitHub SSH authentication and repository write permission were verified, then the
+existing `plat/ingest-integrity-readiness` branch was pushed and its remote SHA
+checked. `main` was not pushed. GitHub's repository key must be selected explicitly
+for the current SSH origin; no SSH configuration was changed:
+
+```bash
+GIT_SSH_COMMAND='ssh -i /home/ai-secops/.ssh/github_ai_secops -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes' git push origin plat/ingest-integrity-readiness
+```
+
+The completed image was reused after verifying its revision label, runtime source
+hashes, health probe, and installed dependencies against approved source commit
+`3ae05173b4ed343ca28a724f5631b28e924e2fcc`. No runtime source changes exist between
+that commit and the documentation commits. Its image identifier is
+`sha256:83bad0b056cbd27fbbed3ec602d08f27e049b2e5d09da4692f8c07c7f2c753d9`.
+The ingest-only Compose update confirmed the service was already current; no
+container restart was needed. All 79 regression tests passed (one test-client
+compatibility deprecation warning), as did dependency checks and live self-check.
+
+Live health, readiness, OpenAPI and documentation returned 200. Missing/malformed
+authentication returned 401. Reviewed application logs showed startup completion,
+loaded keys and database pool readiness, with no errors or warnings. PostgreSQL,
+Qdrant and Ollama container IDs/start times, and all existing network IDs and
+internal flags, remained unchanged. No live database write acceptance drill ran.
+
+The retained previous image is
+`ai-secops-ingest-api:rollback-ad77aef344ef`, verified as
+`sha256:ad77aef344ef71fde73472ad3e65ca4490d8085fe0e2a5c94b2f74cd297c6d90`.
+For an operator-approved rollback, on the VM:
+
+```bash
+cd /home/ai-secops/ai-secops/infrastructure
+docker image tag ai-secops-ingest-api:rollback-ad77aef344ef ai-secops-ingest-api:latest
+docker compose --env-file .env --profile api up -d --no-deps --no-build --pull never --wait --wait-timeout 60 ingest-api
+```
+
+Check `/readyz`, application logs and `scripts/selfcheck.py` after rollback.
+Rollback affects only ingest; it does not restore databases or alter networks.

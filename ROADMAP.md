@@ -19,8 +19,9 @@ all six governance schema gates, reference checks, weakness sweep (including
 8 detector self-tests), dependency consistency, and the updated read-only live
 self-check pass on the VM. After subsequent explicit approval, commit `3ae0517`
 was deployed to ingest only on 4 November 2026; live readiness, documentation,
-and unauthorized-request checks passed. GitHub push remains blocked by missing
-VM authentication. No database/network/security-policy changes accompanied rollout. See `docs/deployment-inventory.md` for test commands and limits.
+and unauthorized-request checks passed. On 5 November 2026, GitHub SSH write
+access and the feature-branch push were verified using the existing repository key.
+No database/network/security-policy changes accompanied rollout. See `docs/deployment-inventory.md` for test commands and limits.
 
 Operational hold points require separate approval: reconcile repository versus
 `/opt/ai-secops` Compose/storage definitions; restrict audit privileges; replace
