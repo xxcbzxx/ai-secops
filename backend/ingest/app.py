@@ -89,7 +89,11 @@ class Tokens:
                     log.warning("tokens file line %d malformed — skipped", n)
                     continue
                 name, token, scopes = parts
-                entries[token.strip()] = (name.strip(), frozenset(
+                token = token.strip()
+                if not token.isascii() or any(not 33 <= ord(c) <= 126 for c in token):
+                    log.warning("tokens file line %d has invalid token syntax — skipped", n)
+                    continue
+                entries[token] = (name.strip(), frozenset(
                     s.strip() for s in scopes.replace(",", " ").split() if s.strip()))
         self.index = entries
         if entries:
@@ -107,7 +111,11 @@ class Tokens:
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(status_code=401, detail="bearer key required",
                                 headers={"WWW-Authenticate": "Bearer"})
-        presented = authorization[7:].strip()
+        presented = authorization[7:]
+        if (not presented or not presented.isascii()
+                or any(not 33 <= ord(c) <= 126 for c in presented)):
+            raise HTTPException(status_code=401, detail="invalid bearer key",
+                                headers={"WWW-Authenticate": "Bearer"})
         for token, (name, scopes) in self.index.items():
             if hmac.compare_digest(token, presented):
                 if scope not in scopes:
@@ -159,7 +167,9 @@ def db() -> Any:
         yield conn
 
 
-DbDep = Annotated[Any, Depends(db)]
+# Finalize the transaction before FastAPI sends a successful response.
+# Request-scoped yield cleanup runs too late to report a failed commit.
+DbDep = Annotated[Any, Depends(db, scope="function")]
 
 
 def resolve_asset(cur, uid: str) -> int:
@@ -172,12 +182,17 @@ def resolve_asset(cur, uid: str) -> int:
     return row[0]
 
 
-def resolve_service(cur, uid: str) -> int:
-    cur.execute("SELECT id FROM ops.services WHERE service_uid = %s", (uid,))
+def resolve_service(cur, uid: str, asset_id: int | None = None) -> int:
+    # Hold the service's parent stable until the finding transaction finishes.
+    cur.execute("SELECT id, asset_id FROM ops.services WHERE service_uid = %s FOR SHARE",
+                (uid,))
     row = cur.fetchone()
     if row is None:
         raise HTTPException(status_code=422, detail=(
             f"service '{uid}' is not on record — POST it first"))
+    if asset_id is not None and row[1] != asset_id:
+        raise HTTPException(status_code=422,
+                            detail="finding service does not belong to the supplied asset")
     return row[0]
 
 
@@ -186,10 +201,9 @@ def run_upsert(conn, sql: str, params: dict) -> tuple[int, bool]:
     with conn.cursor() as cur:
         try:
             cur.execute(sql, params)
-        except psycopg.ForeignKeyViolation as exc:
-            raise HTTPException(status_code=422, detail=(
-                "referenced record missing or parent operation rejected: "
-                + (str(exc).split("DETAIL:", 1)[-1].strip()[:240]))) from exc
+        except psycopg.errors.ForeignKeyViolation as exc:
+            raise HTTPException(status_code=422,
+                                detail="referenced record missing or parent operation rejected") from exc
         except psycopg.errors.UniqueViolation as exc:  # lost an insert race
             raise HTTPException(status_code=409, detail=(
                 "concurrent write on the same key; retry with the same payload")) from exc
@@ -314,17 +328,18 @@ def healthz() -> dict:
 
 @app.get("/readyz")
 def readyz() -> dict:
-    """Readiness — 503 unless the Postgres pool answers (auth is info-only)."""
-    auth = "ok" if TOKENS.index else "missing"
+    """Readiness requires configured keys and an answering Postgres pool."""
+    if not TOKENS.index:
+        raise HTTPException(status_code=503, detail="ingest keys not configured")
     try:
         if POOL is None:
             raise RuntimeError("pool not open")
         with POOL.connection() as conn:
             conn.execute("SELECT 1")
     except Exception as exc:
-        raise HTTPException(status_code=503,
-                            detail=f"postgres unreachable: {str(exc)[:120]}")
-    return {"api_version": API_VERSION, "auth": auth, "db": "ok", "status": "ready"}
+        # Driver errors can contain connection details; never expose them.
+        raise HTTPException(status_code=503, detail="postgres unavailable") from exc
+    return {"api_version": API_VERSION, "auth": "ok", "db": "ok", "status": "ready"}
 
 
 # --------------------------------------------------------------------- assets
@@ -489,7 +504,8 @@ def upsert_finding(body: FindingIn, conn: DbDep,
                    producer: Annotated[str, Depends(guard_findings)]) -> JSONResponse:
     with conn.cursor() as cur:
         asset_id = resolve_asset(cur, body.asset_uid) if body.asset_uid else None
-        service_id = resolve_service(cur, body.service_uid) if body.service_uid else None
+        service_id = (resolve_service(cur, body.service_uid, asset_id)
+                      if body.service_uid else None)
     targets = [t for t in (f"asset:{body.asset_uid}" if body.asset_uid else None,
                            f"service:{body.service_uid}" if body.service_uid else None) if t]
     fingerprint = hashlib.sha256(

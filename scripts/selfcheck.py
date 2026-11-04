@@ -69,31 +69,47 @@ def check_containers() -> bool:
     code, out = docker_compose("ps", "--format", "json", "--all")
     if code != 0:
         return record("A.containers", FAIL, f"docker compose ps failed: {out[:200]}")
-    records = []
-    for line in out.splitlines():
-        if line.strip():
-            try:
-                records.append(json.loads(line))
-            except ValueError as e:
-                return record("A.containers", FAIL, f"parse error: {e}")
-    services = {
-        str(r.get("Service", r.get("Name", f"container-{i}"))): r
-        for i, r in enumerate(records)
-    }
+    try:
+        # Compose versions emit either a JSON array or one JSON object per line.
+        if out.lstrip().startswith("["):
+            records = json.loads(out)
+        else:
+            records = [json.loads(line) for line in out.splitlines() if line.strip()]
+        if not isinstance(records, list) or any(not isinstance(r, dict) for r in records):
+            raise ValueError("expected container objects")
+    except ValueError:
+        return record("A.containers", FAIL, "invalid docker compose ps JSON")
 
     mandatory = {"postgres", "qdrant"}
     optional = {"ollama", "openwebui"}
-    for name, svc in services.items():
-        svc_name = svc.get("Service", name)
-        status = str(svc.get("Status", svc.get("State", "")))
-        healthy = "healthy" in status.lower() or "running" in status.lower()
-        if svc_name in mandatory:
-            ok &= record(f"A.container.{svc_name}", OK if healthy else FAIL, status)
-        elif svc_name in optional:
-            ok &= record(f"A.container.{svc_name}", OK, f"optional loaded: {status}")
-    missing = [s for s in mandatory if s not in [svc.get("Service") for svc in services.values()]]
-    for m in missing:
-        ok &= record(f"A.container.{m}", FAIL, "not running")
+    present = set()
+    for svc in records:
+        name = svc.get("Service")
+        if name not in mandatory | optional:
+            continue
+        present.add(name)
+        container = svc.get("Name")
+        if not container:
+            ok &= record(f"A.container.{name}", FAIL, "container name missing")
+            continue
+        rc, state_json = run(["docker", "inspect", "-f", "{{json .State}}", container])
+        try:
+            if rc != 0:
+                raise ValueError("inspection failed")
+            state = json.loads(state_json)
+            running = state["Running"] is True and state["Status"] == "running"
+            health = state.get("Health", {}).get("Status")
+        except (ValueError, KeyError, TypeError, AttributeError):
+            ok &= record(f"A.container.{name}", FAIL, "cannot verify container state")
+            continue
+        if not running or (health != "healthy" and (name in mandatory or health is not None)):
+            ok &= record(f"A.container.{name}", FAIL,
+                         f"state={state.get('Status')}, health={health or 'missing'}")
+        else:
+            ok &= record(f"A.container.{name}", OK if health else WARN,
+                         f"running, health={health or 'not configured (optional service)'}")
+    for name in sorted(mandatory - present):
+        ok &= record(f"A.container.{name}", FAIL, "not running")
     return ok
 
 
@@ -127,13 +143,25 @@ def check_database() -> bool:
 def check_isolation() -> bool:
     code, out = docker_compose(
         "ps", "--format", "{{.Name}}", "--filter", "status=running")
-    containers = [l.strip() for l in out.splitlines() if l.strip()]
+    if code != 0:
+        return record("C.isolation", FAIL, "cannot list running containers")
+    containers = [line.strip() for line in out.splitlines() if line.strip()]
+    if not containers:
+        return record("C.isolation", FAIL, "no running containers to inspect")
     published = []
-    for c in containers:
+    for container in containers:
         rc, out = run(["docker", "inspect", "-f",
-                       "{{json .HostConfig.PortBindings}}", c])
-        if rc == 0 and out not in ("null", "", "{}"):
-            published.append(c)
+                       "{{json .HostConfig.PortBindings}}", container])
+        try:
+            if rc != 0:
+                raise ValueError("inspection failed")
+            bindings = json.loads(out)
+            if bindings is not None and not isinstance(bindings, dict):
+                raise ValueError("invalid port bindings")
+        except ValueError:
+            return record("C.isolation", FAIL, f"cannot verify ports for {container}")
+        if bindings and any(bindings.values()):
+            published.append(container)
     detail = "no published ports" if not published else f"PUBLISHED: {published}"
     return record("C.isolation", FAIL if published else OK, detail)
 
@@ -197,17 +225,28 @@ def check_ingest() -> bool:
     """F. INGEST — the ops-plane write path is alive (Phase 2, workstream 2.2)."""
     code, out = run(["docker", "inspect", "-f", "{{.State.Health.Status}}",
                      "ai-secops-ingest-api-1"])
-    if code != 0 or out.strip() != "healthy":
-        return record("F.ingest.api", WARN,
-                      f"not up (profile 'api' off) — health={out or 'absent'}; "
-                      "start: docker compose --env-file .env --profile api up -d")
-    ok = record("F.ingest.api", OK, out.strip())
+    if code != 0:
+        # An absent optional service is allowed; an inaccessible daemon is not.
+        rc, names = run(["docker", "ps", "-a", "--format", "{{.Names}}"])
+        if rc != 0:
+            return record("F.ingest.api", FAIL, "cannot determine ingest container state")
+        if "ai-secops-ingest-api-1" not in names.splitlines():
+            return record("F.ingest.api", WARN, "optional ingest service is not deployed")
+        return record("F.ingest.api", FAIL, "cannot inspect deployed ingest health")
+    if out.strip() != "healthy":
+        return record("F.ingest.api", FAIL, "deployed ingest service is not healthy")
+    ok = record("F.ingest.api", OK, "healthy")
     code, out = docker_compose("exec", "-T", "ingest-api", "python", "-c",
         "import urllib.request as u;"
-        "print(u.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read().decode())")
-    ok &= record("F.ingest.healthz",
-                 OK if code == 0 and ('"status":"ok"' in out or '"status": "ok"' in out) else FAIL,
-                 (out.replace(chr(10), " ") or "no output")[:160])
+        "print(u.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read().decode())")
+    try:
+        probe = json.loads(out) if code == 0 else {}
+        ready = (isinstance(probe, dict) and probe.get("status") == "ready"
+                 and probe.get("auth") == "ok" and probe.get("db") == "ok")
+    except ValueError:
+        ready = False
+    ok &= record("F.ingest.readyz", OK if ready else FAIL,
+                 "keys configured, database reachable" if ready else "readiness probe failed")
     code, out = psql("SELECT count(*) FROM pg_roles "
                      "WHERE rolname = 'ai_secops_ingest' AND rolcanlogin;")
     ok &= record("F.ingest.role", OK if code == 0 and out == "1" else FAIL,

@@ -16,11 +16,16 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
+
+      - name: Install development dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Application regression tests (no live services)
+        run: python -m pytest -q
 
       - name: Schema-validate every governance artifact
         run: |
-          pip install check-jsonschema pyyaml
           check-jsonschema --schemafile schemas/policy.schema.json                  policies/*.yaml
           check-jsonschema --schemafile schemas/exception.schema.json             exceptions/*.yaml
           check-jsonschema --schemafile schemas/risk.schema.json                  risks/*.yaml

@@ -1,7 +1,34 @@
 # ROADMAP
 
-Status owner: security-architecture · Last updated: 2026-11-01
+Status owner: security-architecture · Last updated: 2026-11-04
 Context: **solo developer, focused wedge** (ADR-004) · deployment **T1-Compose only** until traction · findings via **generic ingest API** · framework **pack loader** (CIS first)
+
+## Current VM baseline — 4 November 2026
+
+Read-only discovery confirmed healthy PostgreSQL, Qdrant, ingest, and Ollama;
+nine governance projections match repository hashes. The inventory, findings,
+evaluations, and threat tables are empty. Open WebUI and an ingress container
+were not present. Historical `ai-secops01` acceptance notes below are retained;
+current VM hostname is `ai-secops`.
+
+The approved first milestone is **ingest integrity and trustworthy readiness**:
+malformed-token handling, consistent finding targets, transaction completion before
+success, fail-closed readiness, reliable container checks, and regression tests/CI.
+Implemented on `plat/ingest-integrity-readiness`: 79 regression tests pass;
+all six governance schema gates, reference checks, weakness sweep (including
+8 detector self-tests), dependency consistency, and the updated read-only live
+self-check pass on the VM. Source validation does not constitute deployment. See `docs/deployment-inventory.md` for test commands and limits.
+
+Operational hold points require separate approval: reconcile repository versus
+`/opt/ai-secops` Compose/storage definitions; restrict audit privileges; replace
+superuser sync credentials; validate scheduled backups and isolated restores.
+Do not apply grants, migrations, restarts, or deployment during this milestone.
+
+Next: complete `docs/governance-model.md` and `docs/policy-engine.md`, implement
+pure deterministic engine v1 with golden outcomes, then populate an approved
+inventory and add registry/posture reads. `docs/threat-intelligence.md`, framework
+packs, collectors/n8n, correlation, and grounded AI follow later. These referenced
+design documents are currently absent, not completed Phase 1 deliverables.
 
 ---
 

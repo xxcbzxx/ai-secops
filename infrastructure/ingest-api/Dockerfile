@@ -8,9 +8,10 @@ WORKDIR /app
 
 COPY backend/ingest/app.py ./app.py
 COPY scripts/ingest_acceptance.py ./scripts/ingest_acceptance.py
-RUN pip install --no-cache-dir "fastapi>=0.115" "uvicorn>=0.30" "psycopg[binary,pool]>=3.2"
+RUN pip install --no-cache-dir "fastapi==0.162.0" "uvicorn==0.54.0" "psycopg[binary,pool]==3.3.6" \
+    "psycopg-pool==3.3.3" "pydantic==2.14.2" "starlette==1.10.0"
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
-    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"]
+    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/readyz', timeout=4)"]
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,11 @@
+# User-local development/CI; runtime pins match the inspected VM image.
+# Governance dependencies retain requirements.txt's existing version policy.
+-r requirements.txt
+fastapi==0.162.0
+uvicorn==0.54.0
+psycopg[binary,pool]==3.3.6
+psycopg-pool==3.3.3
+pydantic==2.14.2
+starlette==1.10.0
+httpx==0.28.1
+pytest==8.4.1

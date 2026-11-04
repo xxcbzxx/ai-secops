@@ -17,10 +17,10 @@ CISOs get **grounded, contextualised, explainable** guidance.
 
 | Field | Value |
 |---|---|
-| Phase | **1 — Foundation** |
-| Deployment target | VM `ai-secops01` · Debian 13 · Docker / Docker Swarm |
-| Data plane | PostgreSQL · Qdrant · Ollama · Open WebUI (internal-only) |
-| Edge | Cloudflare Tunnel (zero-trust ingress) |
+| Phase | **Foundation + Phase 2 governance sync and ingest implemented; integrity/readiness milestone in source review** |
+| Deployment target | VM `ai-secops` · Debian 13 · Docker Compose (T1) |
+| Data plane | PostgreSQL · Qdrant · Ollama running internally; Open WebUI not running |
+| Edge | Ingest edge network exists; ingress/tunnel not observed on this VM |
 | Source of truth | **Git** — this repository |
 | Version | `0.1.0 foundation` |
 
@@ -29,7 +29,7 @@ CISOs get **grounded, contextualised, explainable** guidance.
 | # | Principle | Meaning |
 |---|-----------|---------|
 | 1 | **Security First** | PostgreSQL, Qdrant and Ollama never leave internal Docker networks. No published ports. |
-| 2 | **Git First** | Policies, Exceptions, Risks, Standards and ADRs live in `governance/` as YAML. Git is the source of truth; the database is a rebuildable projection. |
+| 2 | **Git First** | Policies, Exceptions, Risks, Standards and ADRs live in their root-level artifact directories as YAML. Git is the source of truth; the database is a rebuildable projection. |
 | 3 | **Human Approval** | Every governance transition (approve policy, accept risk, grant exception) is a named, dated, auditable human decision. A requester may never approve their own artifact (4-eyes rule). |
 | 4 | **Local First (default)** | Default inference is local Ollama (Qwen3 / DeepSeek-R1 candidates). Buyers without local GPUs point the LLM adapter at their own endpoint instead; data never leaves the site unless the customer explicitly configures it. |
 | 5 | **Deterministic enforcement** | Compliance evaluation is a pure function. The AI never gates compliance; it advises. |
@@ -107,29 +107,37 @@ Phase 1 — see `ROADMAP.md` for scope discipline.
 | `ADR-003` | Ports-and-adapters product core | Environments are deployments, not specs |
 | `ADR-004` | The wedge — Compose-first, adapter defaults | Solo-dev scope discipline; all options by contract |
 
-## Quick start
+## Development and current implementation
 
-```bash
-# 1. Review governance content (the actual product material)
-git clone <repo> ai-secops && cd ai-secops
-cat policies/POL-001-*.yaml
+All development, testing, and builds occur on the VM in
+`/home/ai-secops/ai-secops`, using a feature branch. Codex Cloud only orchestrates
+SSH. Keep strict host-key verification. Use the tested user-local environment and
+commands in [deployment inventory and development baseline](docs/deployment-inventory.md).
+Do not run deployment/bootstrap scripts to prepare an existing development host.
 
-# 2. Validate every artifact against its JSON schema (Phase 1 CI gate)
-check-jsonschema --schemafile schemas/policy.schema.json governance/policies/*.yaml
+Implemented: governance schema/reference validation, filesystem governance sync
+with provenance, PostgreSQL operational tables, and the scoped FastAPI ingest API.
+The engine, registry reads, operator UI, collectors, framework loader, threat
+correlation, and grounded AI remain future work. Nine governance artifacts are
+projected; live inventory/finding/evaluation tables were empty at discovery.
 
-# 3. Deploy the data plane to ai-secops01 (Phase 1)
-cd ../infrastructure
-docker stack deploy -c docker-stack.yml ai-secops
-```
+The ingest integrity milestone adds regression tests, target consistency,
+fail-closed readiness, transaction completion before success, and stricter platform
+health checks. Source changes require review and an explicitly approved deployment
+before they affect the running API. See [ingest contract](docs/ingest-api.md).
 
-*Schema files and infrastructure files land in the same phase — see `ROADMAP.md` Phase 1.*
+The repository map above describes the intended platform shape. Placeholder
+module READMEs are plans, not evidence of implemented features. Missing referenced
+design documents are tracked in `ROADMAP.md`.
 
 ## Document index
 
 | Document | Content |
 |---|---|
 | `docs/project-vision.md` | Vision, personas, AI operating principles, success metrics |
-| `docs/architecture.md` | Platform architecture, trust boundaries, deployment topology |
+| `docs/architecture.md` | Product architecture and trust boundaries |
+| `docs/deployment-inventory.md` | Verified VM topology, deployment drift, approval boundaries, and development tests |
+| `docs/ingest-api.md` | Implemented API contract and readiness behavior |
 | `ROADMAP.md` | Phased delivery plan and first-30-day execution |
 | `CONTRIBUTING.md` | How to change governance and code, review matrix, conventions |
 
