@@ -17,7 +17,7 @@ CISOs get **grounded, contextualised, explainable** guidance.
 
 | Field | Value |
 |---|---|
-| Phase | **Foundation + Phase 2 governance sync and ingest implemented; integrity/readiness milestone in source review** |
+| Phase | **Foundation + Phase 2 governance sync and ingest implemented; integrity/readiness milestone deployed on the VM** |
 | Deployment target | VM `ai-secops` · Debian 13 · Docker Compose (T1) |
 | Data plane | PostgreSQL · Qdrant · Ollama running internally; Open WebUI not running |
 | Edge | Ingest edge network exists; ingress/tunnel not observed on this VM |
@@ -123,8 +123,9 @@ projected; live inventory/finding/evaluation tables were empty at discovery.
 
 The ingest integrity milestone adds regression tests, target consistency,
 fail-closed readiness, transaction completion before success, and stricter platform
-health checks. Source changes require review and an explicitly approved deployment
-before they affect the running API. See [ingest contract](docs/ingest-api.md).
+health checks. Commit `3ae0517` was deployed to ingest only on 4 November 2026
+after explicit approval. See the [live API access instructions](docs/deployment-inventory.md#view-the-live-api-without-exposing-a-host-port)
+and [ingest contract](docs/ingest-api.md).
 
 The repository map above describes the intended platform shape. Placeholder
 module READMEs are plans, not evidence of implemented features. Missing referenced

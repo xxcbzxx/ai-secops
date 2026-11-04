@@ -17,7 +17,10 @@ success, fail-closed readiness, reliable container checks, and regression tests/
 Implemented on `plat/ingest-integrity-readiness`: 79 regression tests pass;
 all six governance schema gates, reference checks, weakness sweep (including
 8 detector self-tests), dependency consistency, and the updated read-only live
-self-check pass on the VM. Source validation does not constitute deployment. See `docs/deployment-inventory.md` for test commands and limits.
+self-check pass on the VM. After subsequent explicit approval, commit `3ae0517`
+was deployed to ingest only on 4 November 2026; live readiness, documentation,
+and unauthorized-request checks passed. GitHub push remains blocked by missing
+VM authentication. No database/network/security-policy changes accompanied rollout. See `docs/deployment-inventory.md` for test commands and limits.
 
 Operational hold points require separate approval: reconcile repository versus
 `/opt/ai-secops` Compose/storage definitions; restrict audit privileges; replace

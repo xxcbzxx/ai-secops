@@ -135,3 +135,47 @@ contains the changes.
 The live self-check confirms current runtime posture; it does not validate the
 new source in a deployed image. Real PostgreSQL rollback/concurrency verification
 remains a staging integration task requiring separate approval.
+
+## Approved ingest rollout — 4 November 2026
+
+After explicit deployment approval, source commit
+`3ae05173b4ed343ca28a724f5631b28e924e2fcc` was built directly on the VM using a
+minimal context containing only the Dockerfile's two copied source files.
+The verified image is retained as `ai-secops-ingest-api:milestone-3ae0517`;
+the previous image is retained as `ai-secops-ingest-api:rollback-ad77aef344ef`.
+Only `ingest-api` was recreated using repository Compose with
+`--no-deps --no-build --pull never`. PostgreSQL, Qdrant, and Ollama container IDs
+and start times were unchanged. No networks, published ports, migrations,
+privileges, or secret files were changed.
+
+Live `/healthz`, `/readyz`, `/openapi.json`, and `/docs` returned 200. Missing and
+malformed bearer authentication returned 401. Operational inventory/finding rows
+remained zero and audit rows remained 16. The updated platform self-check passed.
+Real PostgreSQL write/rollback and concurrency integration tests were not run.
+
+Deployment records are stored outside Git at
+`~/.local/state/ai-secops/deployments/3ae0517/`. GitHub push was attempted but
+blocked because VM HTTPS Git authentication is not configured; no SSH key,
+credential helper, GitHub token binding, or GitHub CLI session was available.
+Do not put credentials into this document or Git remotes.
+
+### View the live API without exposing a host port
+
+From a computer on the tailnet, with the independently verified VM host key
+already trusted by that computer's SSH client, keep this command running:
+
+```bash
+ssh -o StrictHostKeyChecking=yes -N -L 127.0.0.1:18000:172.18.0.2:8000 ai-secops@100.107.201.39
+```
+
+Open `http://127.0.0.1:18000/docs` for API documentation, or `/readyz` for readiness.
+This is the ingest API, not the future operator dashboard. Local forwarding was
+verified through Tailscale SSH. Closing SSH closes access. The destination is the
+current ingest edge-network container IP; recheck it after container recreation:
+
+```bash
+docker inspect -f '{{(index .NetworkSettings.Networks "ai-secops_edge").IPAddress}}' ai-secops-ingest-api-1
+```
+
+No persistent ingress or public endpoint was added. API writes still require a
+scoped collector credential; do not experiment with write endpoints on live data.
